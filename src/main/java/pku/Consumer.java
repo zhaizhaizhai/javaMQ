@@ -1,42 +1,69 @@
 package pku;
 
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
 
 /**
  * 消费者
+ * <p>
+ * attachQueue
+ * <p>
+ * poll
  */
 
+import java.io.IOException;
+import java.util.*;
+
+
 public class Consumer {
-    List<String> topics = new LinkedList<>();
-    int readPos = 0;
-    String queue;
 
-    //将消费者订阅的topic进行绑定
-    public void attachQueue(String queueName, Collection<String> t) throws Exception {
-        if (queue != null) {
-            throw new Exception("只允许绑定一次");
-        }
-        queue = queueName;
-        topics.addAll(t);
+    private String queue;
+    private List<String> bucketList = new ArrayList<>();
+    private Set<String> buckets = new HashSet<>();
+
+    private int lastIndex = 0;
+    private final DemoMessageStore messageStore = new DemoMessageStore();
+
+
+    public Consumer() {
+
     }
 
-
-    //每次消费读取一个message
     public ByteMessage poll() {
-        ByteMessage re = null;
-        //先读第一个topic, 再读第二个topic...
-        //直到所有topic都读完了, 返回null, 表示无消息
-        for (int i = 0; i < topics.size(); i++) {
-            int index = (i + readPos) % topics.size();
-            re = DemoMessageStore.store.pull(queue, topics.get(index));
-            if (re != null) {
-                readPos = index + 1;
-                break;
-            }
+        if (bucketList.size() == 0 || queue == null) {
+            return null;
         }
-        return re;
+        ByteMessage message;
+        // // 慢轮询, 不致饿死后面的 topic, 又可提高 page cache 命中
+        // 针对测试优化
+        while (lastIndex < bucketList.size()) {
+
+            message = messageStore.pollMessage(bucketList.get(lastIndex));
+            if (message != null) {
+                return message;
+            }
+            // 只有不命中时才 lastIndex++, 命中时(此 topic 有新 message)会下一次继续读此 topic
+            lastIndex++;
+
+
+        }
+        return null;
     }
+
+
+    public void attachQueue(String queueName, Collection<String> topics) {
+        if (queue != null && !queue.equals(queueName)) {
+            return;
+        }
+        buckets.addAll(topics);
+        bucketList.clear();
+        bucketList.addAll(buckets);
+        System.out.println(bucketList.size());
+        // 排序, 提高 page cache 命中
+        bucketList.sort(null);
+
+        // 最后消费 queue
+        queue = queueName;
+        // bucketList.add(queueName);
+    }
+
 
 }

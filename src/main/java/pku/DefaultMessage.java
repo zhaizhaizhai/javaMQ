@@ -1,16 +1,22 @@
 package pku;
 
 /**
- *消息的实现
+ * 消息的实现
  */
-public class DefaultMessage implements ByteMessage{
+public class DefaultMessage implements ByteMessage {
 
     private KeyValue headers = new DefaultKeyValue();
     private byte[] body;
 
+
+
     public void setHeaders(KeyValue headers) {
         this.headers = headers;
     }
+
+    public DefaultMessage() {
+    }
+
 
     public DefaultMessage(byte[] body) {
         this.body = body;
@@ -47,6 +53,14 @@ public class DefaultMessage implements ByteMessage{
     public DefaultMessage putHeaders(String key, String value) {
         headers.put(key, value);
         return this;
+    }
+
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{ headers= ").append(headers.toString()).append(", ");
+        sb.append("body= ").append(new String(body));
+        sb.append(" }");
+        return sb.toString();
     }
 
 }
